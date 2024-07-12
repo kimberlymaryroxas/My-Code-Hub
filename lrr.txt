@@ -1,0 +1,69 @@
+import pandas as pd
+import os
+
+lrr = pd.read_excel('C:\\Users\\krox\\Documents\\work\\lrr.xlsx')
+del lrr['Status']
+lrr['Count'] = 1
+lrr['Generic'] = lrr['Device#'].str[0:5]
+lrr['Year'] = lrr['Month'].dt.year
+lrr['Months'] = lrr['Month'].dt.month
+lrr.drop(columns='Month', inplace=True)
+lrr_columns = list(lrr.columns)
+lrr = lrr[lrr_columns[-2:] + [lrr_columns[-3]] + lrr_columns[0:6] + [lrr_columns[-5]] + [lrr_columns[7]] + [lrr_columns[6]]+ [lrr_columns[-4]]]
+lrr = lrr.rename(columns = {'Months':'Month Mark'})
+month_map = {
+    1: 'January',
+    2: 'February',
+    3: 'March',
+    4: 'April',
+    5: 'May',
+    6: 'June',
+    7: 'July',
+    8: 'August',
+    9: 'September',
+    10: 'October',
+    11: 'November',
+    12: 'December'
+}
+lrr['Month'] = lrr['Month Mark'].map(month_map)
+lrr_columns = list(lrr.columns)
+lrr = lrr[[lrr_columns[0]] + [lrr_columns[-1]] + lrr_columns[1:13]]
+columns_to_convert = ['Month', 'DeviceName', 'Device#', 'Business Line', 'Product Division', 'Lot Ref', 'Remarks', 'Disposition', 'First Pass Defects Classification']
+for col in columns_to_convert:
+    lrr.loc[:, col] = lrr[col].astype(str).str.strip().str.title()
+lrr.loc[lrr['Remarks'].str.strip() == 'Acc_Id_Ilim_ Max', 'Remarks'] = 'Acc_Id_Ilim_Max'
+lrr.loc[lrr['Remarks'].str.strip() == 'Thd Fail', 'Remarks'] = 'Thd Fails'
+lrr.to_excel('lrr_modified.xlsx', index=False)
+lrr_modified = lrr
+lrr.info()
+
+
+
+
+
+
+
+------------------
+lrr2023 = lrr_modified.loc[lrr_modified['Year'] == 2023]
+lrr['Device#'] = lrr['Device#'].astype(str).str.strip()
+lrr2023.loc[:, 'Remarks'] = lrr2023['Remarks'].str.strip().str.title()
+lrr2023.to_excel('lrr2023.xlsx', index=False)
+
+__________
+lrr2023_grouped = lrr2023.groupby(['Generic', 'DeviceName', 'Disposition']).count()['Count'].reset_index()
+lrr2023_disposition_pivot = lrr2023_grouped.pivot_table(index=['DeviceName', 'Generic'], columns='Disposition', values='Count', fill_value=0)
+lrr2023_disposition_pivot['Grand Total'] = lrr2023_disposition_pivot.sum(axis=1)
+lrr2023_disposition_pivot = lrr2023_disposition_pivot.sort_values(by='Grand Total', ascending=0)
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+lrr2023_disposition_pivot = lrr2023_disposition_pivot.astype(int)
+
+lrr2023_disposition_pivot
+__________lrr2023_50276 = lrr2023[lrr2023['Generic'] == '50276'].groupby(['Generic', 'Remarks']).count()['Count'].reset_index()
+lrr2023_50276_expanded = lrr2023_50276.assign(Remarks=lrr2023_50276['Remarks'].str.split(', ')).explode('Remarks')
+lrr2023_50276_final = lrr2023_50276_expanded.groupby(['Generic', 'Remarks']).sum().reset_index().sort_values(by='Count', ascending=False)
+top50276LRR = lrr2023_50276_final.head(4).reset_index()
+top50276LRR_list = top50276LRR['Remarks'].tolist()
+top50276LRR = pd.DataFrame(top50276LRR)
+top50276LRR
